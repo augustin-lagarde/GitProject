@@ -1,0 +1,85 @@
+---
+title: "Practical Machine Learning Project"
+author: "Augustin Lagarde"
+date: "Sunday, April 26, 2015"
+output: html_document
+---
+
+# Abstract
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, the goal was to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The goal of this project was to predict the manner in which they did the exercise.
+
+
+# Data 
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+# Data Cleaning
+
+First we downloaded and loaded the data into R.
+
+```{r}
+training <- read.csv("training.csv")
+testing <- read.csv("testing.csv")
+```
+
+We got rid off the variables with too few observations and of the statistical computation performed by the authors of the original paper.
+
+```{r}
+library(caret)
+training <- training[,-c(1:5,7,nearZeroVar(training))]
+
+stat_str <- c(
+        grep("^max_", colnames(training), value = TRUE),
+        grep("^min_", colnames(training), value = TRUE),
+        grep("^amplitude_", colnames(training), value = TRUE),
+        grep("^var_", colnames(training), value = TRUE),
+        grep("^avg_", colnames(training), value = TRUE),
+        grep("^stddev_", colnames(training), value = TRUE)
+        )
+
+training <- training[,!names(training) %in% stat_str]
+testing <- testing[,names(testing) %in% names(training)]
+```
+
+# Data Partition for CV
+
+To perform a Cross Validation Analysis, we partitioned the training set into two subsample with 60% atributed to the Machine Learning algorythm.
+
+```{r}
+set.seed(8335)
+inTrain <- createDataPartition(y = training$classe, p = 0.6, list = FALSE)
+
+sub_train <- training[inTrain,]
+sub_test <- training[-inTrain,]
+```
+
+# Machine Learning Algorythm : Random Forest
+
+The advantage of using Random Forest algorythm is that it automatically selects the most relevant features and also RF algorythms are known for their accuracy which is the goal asked in this study.
+
+To prevent for time-consuming procedure and to limit the risk of crash, I used 5-fold cross validation when performing the algorythm and set the number of trees to construct to 250.
+
+```{r}
+control <- trainControl(method="cv", 5)
+model.rf <- train(classe ~ ., data=sub_train, method="rf", trControl=control, ntree=250)
+model.rf$finalModel
+
+predictions <- predict(model.rf, newdata = sub_test)
+confusionMatrix(predictions,sub_test$classe)
+```
+
+# Conclusion
+
+We found a 0.99 Accuracy meaning a less than .01 in-sample error rate. We expect the out-of-sample error rate not to be too high and less than the .05 usual acceptance threshold.
+
